@@ -11,7 +11,9 @@ def app(tmp_path, monkeypatch):
 
 def test_health(app):
     c = app.test_client()
-    assert c.get("/health").status_code == 200
+    response = c.get("/health")
+    assert response.status_code == 200
+    assert response.get_json()["database_backend"] == "sqlite"
 
 
 def test_student_menu_and_orders_pages(app):
@@ -44,6 +46,48 @@ def test_student_can_sign_in_if_audit_log_write_fails(app):
     })
     assert login.status_code == 200, login.get_data(as_text=True)
     assert client.get("/api/me").status_code == 200
+
+
+def test_order_tracking_and_alerts_update_for_student_and_staff(app):
+    student = app.test_client()
+    staff = app.test_client()
+    assert student.post("/api/auth/login", json={
+        "email": "vrushali@example.com",
+        "password": "Student@123",
+    }).status_code == 200
+
+    with app.app_context():
+        item_id = get_db().execute(
+            "SELECT id FROM menu_items WHERE name='Veg Thali' ORDER BY id LIMIT 1"
+        ).fetchone()[0]
+
+    order = student.post("/api/orders", json={"items": [{"id": item_id, "quantity": 1}]})
+    assert order.status_code == 201, order.get_data(as_text=True)
+    with app.app_context():
+        order_id = get_db().execute(
+            "SELECT id FROM orders WHERE public_order_id=?", (order.get_json()["order_id"],)
+        ).fetchone()[0]
+
+    assert staff.post("/api/auth/login", json={
+        "email": "staff@example.com",
+        "password": "Staff@123",
+    }).status_code == 200
+    staff_alerts = staff.get("/api/notifications").get_json()["notifications"]
+    assert any(alert["title"] == "New order" for alert in staff_alerts)
+
+    for status in ("ACCEPTED", "PREPARING", "READY"):
+        response = staff.put(f"/api/staff/orders/{order_id}/status", json={"status": status})
+        assert response.status_code == 200, response.get_data(as_text=True)
+        assert student.get("/api/queue/my-position").get_json()["status"] == status
+
+    collected = staff.post(f"/api/staff/orders/{order_id}/verify")
+    assert collected.status_code == 200
+    assert student.get("/api/queue/my-position").get_json() == {}
+    student_alerts = student.get("/api/notifications").get_json()["notifications"]
+    staff_alerts = staff.get("/api/notifications").get_json()["notifications"]
+    assert any("has been collected" in alert["message"] for alert in student_alerts)
+    assert any(alert["title"] == "Order collected" for alert in staff_alerts)
+    assert staff.get("/api/staff/orders").get_json()["orders"] == []
 
 
 def test_admin_analytics_loads(app):
@@ -80,6 +124,8 @@ def test_student_can_cancel_order_and_restore_stock(app):
             "pickup_slot": "ASAP",
         })
         assert order.status_code == 201, order.get_data(as_text=True)
+        notifications = client.get("/api/notifications").get_json()["notifications"]
+        assert any(note["title"] == "Order placed" for note in notifications)
         history = client.get("/api/orders")
         assert history.status_code == 200
         assert history.get_json()["orders"][0]["items"] == "Cancel Test Dish x2"

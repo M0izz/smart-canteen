@@ -42,6 +42,13 @@ def audit(action, entity="", entity_id=None, desc=""):
     get_db().execute("INSERT INTO audit_logs(user_id,action,entity,entity_id,description) VALUES(?,?,?,?,?)",
                      (u["id"] if u else None,action,entity,entity_id,desc))
 
+def notify_staff(db, title, message):
+    staff=db.execute("""SELECT u.id FROM users u JOIN roles r ON r.id=u.role_id
+                        WHERE u.active=1 AND r.name IN ('STAFF','ADMIN')""").fetchall()
+    for recipient in staff:
+        db.execute("INSERT INTO notifications(user_id,title,message) VALUES(?,?,?)",
+                   (recipient["id"],title,message))
+
 @bp.route("/")
 def index(): return render_template("index.html")
 @bp.route("/login")
@@ -64,7 +71,8 @@ def admin_page(): return render_template("admin.html")
 @bp.get("/health")
 def health():
     get_db().execute("SELECT 1")
-    return jsonify(status="healthy",database="connected")
+    return jsonify(status="healthy",database="connected",
+                   database_backend="postgresql" if DATABASE_URL else "sqlite")
 
 @bp.post("/api/auth/register")
 def register():
@@ -146,6 +154,7 @@ def create_order():
             db.execute("UPDATE menu_items SET stock_quantity=stock_quantity-? WHERE id=?",(q,row["id"]))
         db.execute("INSERT INTO queue(order_id,position,status) VALUES(?,?,?)",(oid,token-100,"WAITING"))
         db.execute("INSERT INTO notifications(user_id,title,message) VALUES(?,?,?)",(u["id"],"Order placed",f"Your token is #{token}"))
+        notify_staff(db,"New order",f"Token #{token} · {public} is waiting for acceptance.")
         audit("ORDER_CREATED","orders",oid,public); db.commit()
     except Exception as e:
         db.rollback(); return jsonify(error=str(e)),400
@@ -178,6 +187,7 @@ def cancel_order(oid):
     db.execute("UPDATE orders SET status='CANCELLED' WHERE id=?",(oid,))
     db.execute("UPDATE queue SET status='CANCELLED' WHERE order_id=?",(oid,))
     db.execute("INSERT INTO notifications(user_id,title,message) VALUES(?,?,?)",(u["id"],"Order cancelled",f"Order {row['public_order_id']} was cancelled. Stock has been restored."))
+    notify_staff(db,"Order cancelled",f"{row['public_order_id']} was cancelled by the student.")
     audit("ORDER_CANCELLED","orders",oid,f"Student cancelled {row['public_order_id']}"); db.commit()
     return jsonify(message="Order cancelled", order_id=row["public_order_id"])
 
@@ -211,7 +221,9 @@ def staff_orders():
     rows=get_db().execute(f"""SELECT o.*,u.full_name student,
         {aggregate} items
         FROM orders o JOIN users u ON u.id=o.user_id JOIN order_items oi ON oi.order_id=o.id
-        JOIN menu_items m ON m.id=oi.menu_item_id GROUP BY o.id ORDER BY o.id DESC""").fetchall()
+        JOIN menu_items m ON m.id=oi.menu_item_id
+        WHERE o.status NOT IN ('COLLECTED','CANCELLED')
+        GROUP BY o.id,u.full_name ORDER BY o.created_at ASC,o.id ASC""").fetchall()
     return jsonify(orders=[dict(r) for r in rows])
 
 @bp.put("/api/staff/orders/<int:oid>/status")
@@ -224,6 +236,7 @@ def status(oid):
     db=get_db(); db.execute("UPDATE orders SET status=? WHERE id=?",(new,oid))
     db.execute("UPDATE queue SET status=? WHERE order_id=?",(new,oid))
     db.execute("INSERT INTO notifications(user_id,title,message) VALUES(?,?,?)",(row["user_id"],"Order update",f"Order {row['public_order_id']} is {new}"))
+    notify_staff(db,"Order status updated",f"{row['public_order_id']} is now {new}.")
     audit("STATUS_CHANGED","orders",oid,f"{row['status']} -> {new}"); db.commit()
     return jsonify(message="Updated")
 
@@ -234,6 +247,9 @@ def verify(oid):
     if not row or row["status"]!="READY": return jsonify(error="Order is not ready"),400
     db=get_db(); db.execute("UPDATE orders SET status='COLLECTED' WHERE id=?",(oid,))
     db.execute("UPDATE queue SET status='COLLECTED' WHERE order_id=?",(oid,))
+    db.execute("INSERT INTO notifications(user_id,title,message) VALUES(?,?,?)",
+               (row["user_id"],"Order update",f"Order {row['public_order_id']} has been collected."))
+    notify_staff(db,"Order collected",f"{row['public_order_id']} was collected.")
     audit("QR_VERIFIED","orders",oid,"QR/order verification completed"); db.commit()
     return jsonify(message="Collected")
 

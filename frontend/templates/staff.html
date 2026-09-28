@@ -7,7 +7,12 @@
 	<link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-	<nav><b>SMART CANTEEN</b><span class="nav-context">MAIN CANTEEN <span aria-hidden="true">/</span> KITCHEN</span><button onclick="logout()">Log out</button></nav>
+	<nav>
+		<b>SMART CANTEEN</b>
+		<span class="nav-context">MAIN CANTEEN <span aria-hidden="true">/</span> KITCHEN</span>
+		<button class="notification-shortcut" id="openNotifications" type="button" aria-label="Notifications, 0 unread">Updates <span class="notification-badge" id="unreadCount" hidden>0</span></button>
+		<button onclick="logout()">Log out</button>
+	</nav>
 	<main class="container staff-dashboard">
 		<header class="page-heading">
 			<div><p class="eyebrow">KITCHEN WORKSPACE</p><h1>Order queue</h1><p>Work from the earliest placed order and move each ticket through pickup.</p></div>
@@ -15,6 +20,19 @@
 		</header>
 		<div id="staffOrders" class="staff-order-grid" aria-live="polite"><p class="empty-state">Loading kitchen orders...</p></div>
 	</main>
+	<dialog class="notifications-dialog" id="notificationsDialog" aria-labelledby="notificationsTitle">
+		<div class="notifications-dialog-head">
+			<div><p class="eyebrow">KITCHEN ALERTS</p><h2 id="notificationsTitle">Notifications</h2></div>
+			<button class="notifications-close" id="closeNotifications" type="button" aria-label="Close notifications">×</button>
+		</div>
+		<div id="notifications" class="activity-list"><p class="empty-state">Loading notifications...</p></div>
+	</dialog>
+	<aside class="notification-toast" id="notificationToast" role="status" aria-live="polite" aria-atomic="true" aria-hidden="true">
+		<span class="toast-marker" aria-hidden="true"></span>
+		<span class="toast-message" id="notificationToastText"></span>
+		<button type="button" id="openNotificationsFromToast" class="toast-link">View</button>
+		<button type="button" id="dismissNotificationToast" aria-label="Dismiss notification">×</button>
+	</aside>
 	<script src="/static/js/app.js"></script>
 	<script>initStaff()</script>
 </body>

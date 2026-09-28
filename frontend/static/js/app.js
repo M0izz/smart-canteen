@@ -77,7 +77,8 @@ async function initOrders(){
 			if(cancelButton)cancelOrder(Number(cancelButton.dataset.cancelId));
 		});
 		refreshCart();
-		await Promise.all([refreshOrders(),refreshQueue(),refreshNotifications()]);
+		await Promise.all([refreshOrders(),refreshQueue(),refreshNotifications(true)]);
+		setInterval(()=>refreshOrders().catch(showDashboardError),10000);
 		setInterval(()=>refreshQueue().catch(showDashboardError),10000);
 		setInterval(()=>refreshNotifications(true).catch(()=>{}),15000);
 	}catch(e){
@@ -186,7 +187,7 @@ async function placeOrder(){
 		persistCart();
 		refreshCart();
 		$('orderMsg').textContent=`Order ${d.order_id} placed. Your token is #${d.token}.`;
-		await Promise.all([refreshOrders(),refreshQueue()]);
+		await Promise.all([refreshOrders(),refreshQueue(),refreshNotifications()]);
 	}catch(e){$('orderMsg').textContent=e.message}
 	finally{button.textContent='Place order';button.disabled=!cart.length}
 }
@@ -266,17 +267,25 @@ function showDashboardError(error){
 	});
 }
 
-async function initStaff(){try{await api('/api/me');refreshStaff();setInterval(refreshStaff,5000)}catch(e){location.href='/login'}}
+async function initStaff(){
+	try{
+		await api('/api/me');
+		setupNotificationControls();
+		await Promise.all([refreshStaff(),refreshNotifications()]);
+		setInterval(()=>refreshStaff().catch(showDashboardError),5000);
+		setInterval(()=>refreshNotifications(true).catch(()=>{}),10000);
+	}catch(e){if(e.message==='Authentication required')location.href='/login';else showDashboardError(e)}
+}
 async function refreshStaff(){
 	const d=await api('/api/staff/orders');
 	$('staffOrders').innerHTML=d.orders.map(x=>`<article class="staff-order">
 		<header><div><span class="ticket-number">#${escapeHTML(x.token_number)}</span><strong>${escapeHTML(x.public_order_id)}</strong></div><span class="status">${escapeHTML(x.status.replaceAll('_',' '))}</span></header>
-		<p class="staff-customer">${escapeHTML(x.student)}</p><p class="staff-items">${escapeHTML(x.items)}</p>
+		<p class="staff-customer">${escapeHTML(x.student)}</p><p class="staff-order-time">${escapeHTML(formatDateTime(x.created_at))}</p><p class="staff-items">${escapeHTML(x.items)}</p>
 		<div class="staff-order-footer"><span>Order #${escapeHTML(x.id)}</span>${x.status==='ORDER_PLACED'?`<button onclick="setStatus(${Number(x.id)},'ACCEPTED')">Accept order</button>`:''}${x.status==='ACCEPTED'?`<button onclick="setStatus(${Number(x.id)},'PREPARING')">Start preparing</button>`:''}${x.status==='PREPARING'?`<button onclick="setStatus(${Number(x.id)},'READY')">Mark ready</button>`:''}${x.status==='READY'?`<button onclick="verify(${Number(x.id)})">Mark collected</button>`:''}</div>
 	</article>`).join('')||'<p class="empty-state">No orders in the kitchen queue.</p>';
 }
-async function setStatus(id,status){await api('/api/staff/orders/'+id+'/status',{method:'PUT',body:JSON.stringify({status})});refreshStaff()}
-async function verify(id){await api('/api/staff/orders/'+id+'/verify',{method:'POST'});refreshStaff()}
+async function setStatus(id,status){await api('/api/staff/orders/'+id+'/status',{method:'PUT',body:JSON.stringify({status})});await Promise.all([refreshStaff(),refreshNotifications(true)])}
+async function verify(id){await api('/api/staff/orders/'+id+'/verify',{method:'POST'});await Promise.all([refreshStaff(),refreshNotifications(true)])}
 async function initAdmin(){
 	try{
 		await api('/api/me');
