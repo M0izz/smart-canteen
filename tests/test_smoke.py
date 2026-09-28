@@ -31,6 +31,21 @@ def test_student_menu_and_orders_pages(app):
     assert b"Your orders" in orders.data
 
 
+def test_student_can_sign_in_if_audit_log_write_fails(app):
+    with app.app_context():
+        db = get_db()
+        db.execute("DROP TABLE audit_logs")
+        db.commit()
+
+    client = app.test_client()
+    login = client.post("/api/auth/login", json={
+        "email": "vrushali@example.com",
+        "password": "Student@123",
+    })
+    assert login.status_code == 200, login.get_data(as_text=True)
+    assert client.get("/api/me").status_code == 200
+
+
 def test_student_can_cancel_order_and_restore_stock(app):
     with app.app_context():
         db = get_db()

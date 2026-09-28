@@ -1,6 +1,6 @@
 import re, secrets, sqlite3
 from functools import wraps
-from flask import Blueprint, request, jsonify, session, render_template, g
+from flask import Blueprint, request, jsonify, session, render_template, g, current_app
 from werkzeug.security import generate_password_hash, check_password_hash
 from . import get_db
 
@@ -87,7 +87,11 @@ def login():
     if not u or not check_password_hash(u["password_hash"],d.get("password","")):
         return jsonify(error="Invalid credentials"),401
     session.clear(); session["user_id"]=u["id"]
-    audit("LOGIN","users",u["id"],"Successful login"); get_db().commit()
+    try:
+        audit("LOGIN","users",u["id"],"Successful login"); get_db().commit()
+    except sqlite3.Error:
+        get_db().rollback()
+        current_app.logger.exception("Could not record successful login audit event")
     return jsonify(id=u["id"],name=u["full_name"],role=u["role"])
 
 @bp.post("/api/auth/logout")
