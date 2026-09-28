@@ -24,7 +24,7 @@ Change these credentials before deployment.
 `docker compose up --build`
 
 ## Vercel
-Deploy the repository root; Vercel detects the Flask app from `app.py`. Set `SECRET_KEY` and a hosted PostgreSQL connection string as `DATABASE_URL` in the Vercel project environment variables for both Production and Preview. The app creates its schema and demo records on startup. Without `DATABASE_URL`, it falls back to SQLite in `/tmp`, which is temporary and not shared across function instances.
+Deploy the repository root; Vercel detects the Flask app from `app.py`. Set `SECRET_KEY` and a hosted PostgreSQL connection string as `DATABASE_URL` (or Vercel Postgres `POSTGRES_URL`) in the Vercel project environment variables for both Production and Preview. The app creates its schema and demo records on startup. Without a PostgreSQL URL, it falls back to SQLite in `/tmp`, which is temporary and not shared across function instances.
 
 ## Tests
 `pytest -q`
