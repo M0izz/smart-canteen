@@ -3,39 +3,46 @@
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width,initial-scale=1">
-	<title>Menu | Smart Canteen</title>
+	<title>Your Order | Smart Canteen</title>
 	<link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
 	<nav>
 		<b>SMART CANTEEN</b>
 		<span class="nav-context">MAIN CANTEEN <span aria-hidden="true">/</span> STUDENT</span>
-		<a class="nav-link" href="/dashboard" aria-current="page">Menu</a>
-		<a class="nav-link" href="/orders">Your order <span class="nav-count" id="cartCount" hidden>0</span></a>
+		<a class="nav-link" href="/dashboard">Menu</a>
+		<a class="nav-link" href="/orders" aria-current="page">Your order <span class="nav-count" id="cartCount" hidden>0</span></a>
 		<button class="notification-shortcut" id="openNotifications" type="button" aria-label="Notifications, 0 unread">Updates <span class="notification-badge" id="unreadCount" hidden>0</span></button>
 		<button onclick="logout()">Log out</button>
 	</nav>
-	<main class="container dashboard menu-page">
+	<main class="container dashboard orders-page">
 		<header class="dashboard-head">
 			<div>
 				<p class="eyebrow">YOUR CAMPUS KITCHEN</p>
-				<h1 id="welcome">Today's menu</h1>
-				<p>Freshly prepared dishes from the campus kitchen.</p>
+				<h1>Your order</h1>
+				<p>Review your basket, track pickup, and see your order history.</p>
 			</div>
-			<span class="service-pill"><span aria-hidden="true"></span> Taking orders</span>
+			<a class="btn orders-menu-link" href="/dashboard">Back to menu</a>
 		</header>
-		<section class="menu-section" aria-labelledby="menuTitle">
-			<div class="section-heading">
-				<div><p class="eyebrow">MADE FRESH ON CAMPUS</p><h2 id="menuTitle">Today's menu</h2></div>
-				<span class="menu-count" id="menuCount"></span>
-			</div>
-			<div class="menu-toolbar">
-				<label class="visually-hidden" for="menuSearch">Search menu</label>
-				<input id="menuSearch" type="search" placeholder="Search dishes..." autocomplete="off">
-				<label class="visually-hidden" for="categoryFilter">Filter by category</label>
-				<select id="categoryFilter"><option value="">All categories</option></select>
-			</div>
-			<div class="menu-grid" id="menu" aria-live="polite"><p class="empty-state">Loading today's menu...</p></div>
+		<div class="orders-overview">
+			<section class="checkout-panel" aria-labelledby="cartTitle">
+				<p class="eyebrow">READY WHEN YOU ARE</p>
+				<h2 id="cartTitle">Your order</h2>
+				<div id="cart" class="cart-lines"><p class="empty-state">Your basket is empty.</p></div>
+				<div class="cart-total"><span>Subtotal</span><strong id="cartTotal">₹0</strong></div>
+				<p class="pickup-note">Pickup at the counter <span aria-hidden="true">·</span> ASAP</p>
+				<button class="btn checkout-button" id="placeOrderButton" onclick="placeOrder()" disabled>Place order</button>
+				<p id="orderMsg" class="feedback" role="status" aria-live="polite"></p>
+			</section>
+			<section class="queue-panel" aria-labelledby="queueTitle">
+				<p class="eyebrow">PICKUP TRACKER</p>
+				<h2 id="queueTitle">On the pass</h2>
+				<div id="queue" aria-live="polite"><p class="empty-state">Loading your order...</p></div>
+			</section>
+		</div>
+		<section class="order-history" aria-labelledby="ordersTitle">
+			<div class="section-heading"><div><p class="eyebrow">PAST & PRESENT</p><h2 id="ordersTitle">Your orders</h2></div></div>
+			<div id="orders" class="activity-list"><p class="empty-state">Loading order history...</p></div>
 		</section>
 	</main>
 	<dialog class="notifications-dialog" id="notificationsDialog" aria-labelledby="notificationsTitle">
@@ -52,6 +59,6 @@
 		<button type="button" id="dismissNotificationToast" aria-label="Dismiss notification">×</button>
 	</aside>
 	<script src="/static/js/app.js"></script>
-	<script>initDashboard()</script>
+	<script>initOrders()</script>
 </body>
 </html>

@@ -1,6 +1,7 @@
 const $=id=>document.getElementById(id);
 const escapeHTML=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const money=value=>new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:0}).format(value);
+const formatDateTime=value=>{const date=new Date(`${String(value).replace(' ','T')}Z`);return Number.isNaN(date.getTime())?String(value):new Intl.DateTimeFormat(undefined,{dateStyle:'medium',timeStyle:'short'}).format(date)};
 const api=async(url,opt={})=>{const r=await fetch(url,{headers:{'Content-Type':'application/json'},...opt});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'Request failed');return d};
 function initAuthForms(){
 	$('loginForm')?.addEventListener('submit',event=>{event.preventDefault();login()});
@@ -38,6 +39,7 @@ async function initDashboard(){
 	try{
 		const me=await api('/api/me');
 		$('welcome').textContent='Welcome back, '+me.name;
+		setupNotificationControls();
 		const d=await api('/api/menu');
 		menuItems=d.items;
 		const categories=[...new Set(menuItems.map(item=>item.category))].sort();
@@ -48,6 +50,24 @@ async function initDashboard(){
 			const button=event.target.closest('[data-add-id]');
 			if(button)add(Number(button.dataset.addId));
 		});
+		restoreCart();
+		renderMenu();
+		refreshCart();
+		await refreshNotifications();
+		setInterval(()=>refreshNotifications(true).catch(()=>{}),15000);
+	}catch(e){
+		if(e.message==='Authentication required')location.href='/login';
+		else showDashboardError(e);
+	}
+}
+
+async function initOrders(){
+	try{
+		await api('/api/me');
+		setupNotificationControls();
+		const d=await api('/api/menu');
+		menuItems=d.items;
+		restoreCart();
 		$('cart').addEventListener('click',event=>{
 			const button=event.target.closest('[data-cart-action]');
 			if(button)changeQuantity(Number(button.dataset.itemId),button.dataset.cartAction);
@@ -56,12 +76,6 @@ async function initDashboard(){
 			const cancelButton=event.target.closest('[data-cancel-id]');
 			if(cancelButton)cancelOrder(Number(cancelButton.dataset.cancelId));
 		});
-		$('notifications').addEventListener('click',event=>{
-			const button=event.target.closest('[data-read-id]');
-			if(button)markNotificationRead(Number(button.dataset.readId));
-		});
-		$('dismissNotificationToast').addEventListener('click',hideNotificationToast);
-		renderMenu();
 		refreshCart();
 		await Promise.all([refreshOrders(),refreshQueue(),refreshNotifications()]);
 		setInterval(()=>refreshQueue().catch(showDashboardError),10000);
@@ -70,6 +84,20 @@ async function initDashboard(){
 		if(e.message==='Authentication required')location.href='/login';
 		else showDashboardError(e);
 	}
+}
+
+function setupNotificationControls(){
+	$('openNotifications').addEventListener('click',openNotificationsDialog);
+	$('openNotificationsFromToast').addEventListener('click',openNotificationsDialog);
+	$('closeNotifications').addEventListener('click',()=>$('notificationsDialog').close());
+	$('notificationsDialog').addEventListener('click',event=>{
+		if(event.target===$('notificationsDialog'))$('notificationsDialog').close();
+	});
+	$('notifications').addEventListener('click',event=>{
+		const button=event.target.closest('[data-read-id]');
+		if(button)markNotificationRead(Number(button.dataset.readId));
+	});
+	$('dismissNotificationToast').addEventListener('click',hideNotificationToast);
 }
 
 function renderMenu(){
@@ -81,6 +109,7 @@ function renderMenu(){
 	);
 	$('menuCount').textContent=`${items.length} ${items.length===1?'dish':'dishes'}`;
 	$('menu').innerHTML=items.length?items.map(item=>`<article class="food">
+		<img class="food-image" src="${escapeHTML(item.image||'/static/images/meal-default.jpg')}" alt="${escapeHTML(item.name)}" loading="lazy">
 		<span class="food-category">${escapeHTML(item.category)}</span>
 		<h3>${escapeHTML(item.name)}</h3>
 		<p>${escapeHTML(item.description||'Freshly prepared for you.')}</p>
@@ -95,12 +124,32 @@ function add(id){
 	const selected=cart.find(line=>line.id===id);
 	if(selected){if(selected.quantity>=item.stock_quantity)return;selected.quantity++}
 	else cart.push({id,name:item.name,price:item.price,quantity:1});
-	$('orderMsg').textContent='';
+	if($('orderMsg'))$('orderMsg').textContent='';
+	persistCart();
 	refreshCart();
+}
+
+function restoreCart(){
+	try{
+		const saved=JSON.parse(localStorage.getItem('smartCanteenCart')||'[]');
+		cart=saved.map(line=>{
+			const item=menuItems.find(menuItem=>menuItem.id===Number(line.id));
+			const quantity=Math.min(Math.floor(Number(line.quantity)),Number(item?.stock_quantity||0));
+			return item&&quantity>0?{id:item.id,name:item.name,price:item.price,quantity}:null;
+		}).filter(Boolean);
+	}catch{cart=[]}
+	persistCart();
+}
+
+function persistCart(){
+	try{localStorage.setItem('smartCanteenCart',JSON.stringify(cart))}catch{}
 }
 
 function refreshCart(){
 	const subtotal=cart.reduce((sum,item)=>sum+item.price*item.quantity,0);
+	const totalQuantity=cart.reduce((sum,item)=>sum+item.quantity,0);
+	if($('cartCount')){$('cartCount').hidden=totalQuantity===0;$('cartCount').textContent=totalQuantity>99?'99+':String(totalQuantity)}
+	if(!$('cart'))return;
 	$('cartTotal').textContent=money(subtotal);
 	$('placeOrderButton').disabled=!cart.length;
 	$('cart').innerHTML=cart.length?cart.map(item=>`<div class="cart-line">
@@ -122,6 +171,7 @@ function changeQuantity(id,action){
 		if(line.quantity<(item?.stock_quantity||0))line.quantity++;
 	}
 	cart=cart.filter(item=>item.quantity>0);
+	persistCart();
 	refreshCart();
 }
 
@@ -133,6 +183,7 @@ async function placeOrder(){
 	try{
 		const d=await api('/api/orders',{method:'POST',body:JSON.stringify({items:cart.map(({id,quantity})=>({id,quantity})),pickup_slot:'ASAP'})});
 		cart=[];
+		persistCart();
 		refreshCart();
 		$('orderMsg').textContent=`Order ${d.order_id} placed. Your token is #${d.token}.`;
 		await Promise.all([refreshOrders(),refreshQueue()]);
@@ -143,10 +194,10 @@ async function placeOrder(){
 async function refreshOrders(){
 	const d=await api('/api/orders');
 	$('orders').innerHTML=d.orders.length?d.orders.map(order=>`<article class="activity-row">
-		<div><strong>${escapeHTML(order.public_order_id)}</strong><p>${escapeHTML(order.items)}</p></div>
+		<div><strong>${escapeHTML(order.public_order_id)}</strong><small class="order-date">${escapeHTML(formatDateTime(order.created_at))}</small><p>${escapeHTML(order.items)}</p></div>
 		<div class="activity-meta">
 			<strong>${money(order.total)}</strong>
-			<span class="status">${escapeHTML(order.status.replaceAll('_',' '))}</span>
+			<span class="status status-${escapeHTML(order.status.toLowerCase().replaceAll('_','-'))}">${escapeHTML(order.status.replaceAll('_',' '))}</span>
 			${['ORDER_PLACED','ACCEPTED','PREPARING'].includes(order.status)?`<button type="button" class="cancel-order" data-cancel-id="${Number(order.id)}">Cancel</button>`:''}
 		</div>
 	</article>`).join(''):'<p class="empty-state">Your orders will appear here.</p>';
@@ -191,6 +242,10 @@ function showNotificationToast(note){
 	$('notificationToast').setAttribute('aria-hidden','false');
 	clearTimeout(notificationToastTimer);
 	notificationToastTimer=setTimeout(hideNotificationToast,7000);
+}
+
+function openNotificationsDialog(){
+	$('notificationsDialog').showModal();
 }
 
 function hideNotificationToast(){

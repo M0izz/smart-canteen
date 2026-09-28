@@ -1,14 +1,37 @@
-from backend.app import create_app, get_db
+import pytest
+import backend.app as app_module
+from backend.app import get_db
 
 
-def test_health():
-    app = create_app()
+@pytest.fixture
+def app(tmp_path, monkeypatch):
+    monkeypatch.setattr(app_module, "DB", str(tmp_path / "database.db"))
+    return app_module.create_app()
+
+
+def test_health(app):
     c = app.test_client()
     assert c.get("/health").status_code == 200
 
 
-def test_student_can_cancel_order_and_restore_stock():
-    app = create_app()
+def test_student_menu_and_orders_pages(app):
+    client = app.test_client()
+    login = client.post("/api/auth/login", json={
+        "email": "vrushali@example.com",
+        "password": "Student@123",
+    })
+    assert login.status_code == 200
+
+    menu = client.get("/dashboard")
+    orders = client.get("/orders")
+    assert menu.status_code == 200
+    assert b"Today's menu" in menu.data
+    assert b'id="cart"' not in menu.data
+    assert orders.status_code == 200
+    assert b"Your orders" in orders.data
+
+
+def test_student_can_cancel_order_and_restore_stock(app):
     with app.app_context():
         db = get_db()
         db.execute(

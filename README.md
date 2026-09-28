@@ -28,3 +28,6 @@ Change these credentials before deployment.
 
 ## Important
 SQLite is configured for local development. For production, replace the database adapter with PostgreSQL/MySQL and use a shared database/session strategy before horizontal scaling. WebSocket/QR-camera scanning, password-reset email delivery, AWS provisioning and Jira/GitHub integration are deployment extensions rather than simulated features in this local package.
+
+## Menu Photography
+The bundled dish photos are local copies sourced from Unsplash and used under the [Unsplash License](https://unsplash.com/license). They are free to use subject to the license terms.

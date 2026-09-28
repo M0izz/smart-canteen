@@ -62,15 +62,37 @@ def init_db(app):
     # Seed basic canteen/menu data if missing.
     if db.execute("SELECT COUNT(*) FROM canteens").fetchone()[0] == 0:
         db.execute("INSERT INTO canteens(name,location,active) VALUES ('Main College Canteen','Campus',1)")
-    if db.execute("SELECT COUNT(*) FROM menu_categories").fetchone()[0] == 0:
-        db.execute("INSERT INTO menu_categories(name) VALUES ('Meals'),('Snacks'),('Beverages')")
-    if db.execute("SELECT COUNT(*) FROM menu_items").fetchone()[0] == 0:
-        items = [
-            (1,1,"Veg Thali","Complete vegetarian meal",60,1,50,10),
-            (1,2,"Masala Sandwich","Fresh grilled sandwich",45,1,50,8),
-            (1,2,"Samosa","Crispy potato snack",20,1,100,5),
-            (1,3,"Cold Coffee","Chilled coffee",40,1,60,5)
-        ]
-        db.executemany("INSERT INTO menu_items(canteen_id,category_id,name,description,price,availability,stock_quantity,preparation_time) VALUES(?,?,?,?,?,?,?,?)",items)
+    for category_name in ("Meals", "Snacks", "Beverages"):
+        db.execute("INSERT OR IGNORE INTO menu_categories(name) VALUES (?)", (category_name,))
+    canteen_id = db.execute("SELECT id FROM canteens ORDER BY id LIMIT 1").fetchone()[0]
+    categories = {row[0]: row[1] for row in db.execute("SELECT name,id FROM menu_categories")}
+    items = [
+        ("Veg Thali", "Complete vegetarian meal", 60, "Meals", 50, 10, "veg-thali.jpg"),
+        ("Masala Sandwich", "Fresh grilled sandwich", 45, "Snacks", 50, 8, "masala-sandwich.jpg"),
+        ("Samosa", "Crispy potato snack", 20, "Snacks", 100, 5, "samosa.jpg"),
+        ("Cold Coffee", "Chilled coffee", 40, "Beverages", 60, 5, "cold-coffee.jpg"),
+        ("Veg Biryani", "Fragrant rice with vegetables and warm spices", 95, "Meals", 30, 15, "veg-biryani.jpg"),
+        ("Paneer Wrap", "Grilled paneer, crunchy greens, and mint chutney", 80, "Meals", 25, 10, "paneer-wrap.jpg"),
+        ("Masala Dosa", "Crisp dosa with potato masala and sambar", 70, "Meals", 25, 12, "masala-dosa.jpg"),
+        ("Idli Sambar", "Steamed idlis served with sambar and chutney", 55, "Meals", 35, 10, "idli-sambar.jpg"),
+        ("Chole Bhature", "Spiced chickpeas with soft fried bhature", 85, "Meals", 25, 15, "chole-bhature.jpg"),
+        ("Fruit Bowl", "Seasonal fruit, freshly cut", 50, "Snacks", 25, 5, "fruit-bowl.jpg"),
+        ("Mango Lassi", "Chilled yogurt blended with mango", 45, "Beverages", 40, 5, "mango-lassi.jpg"),
+        ("Lemon Iced Tea", "Black tea shaken with lemon and mint", 35, "Beverages", 40, 5, "lemon-iced-tea.jpg"),
+    ]
+    for name, description, price, category, stock, prep, image in items:
+        existing = db.execute(
+            "SELECT id FROM menu_items WHERE canteen_id=? AND lower(name)=lower(?) ORDER BY id LIMIT 1",
+            (canteen_id, name),
+        ).fetchone()
+        image_path = f"/static/images/{image}"
+        if existing:
+            db.execute("UPDATE menu_items SET image=COALESCE(NULLIF(image,''),?) WHERE id=?", (image_path, existing[0]))
+        else:
+            db.execute(
+                """INSERT INTO menu_items(canteen_id,category_id,name,description,price,availability,
+                   stock_quantity,preparation_time,image) VALUES(?,?,?,?,?,1,?,?,?)""",
+                (canteen_id, categories[category], name, description, price, stock, prep, image_path),
+            )
     db.commit()
     db.close()

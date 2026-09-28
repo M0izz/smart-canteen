@@ -43,6 +43,9 @@ def register_page(): return render_template("register.html")
 @bp.route("/dashboard")
 @login_required
 def dashboard(): return render_template("dashboard.html")
+@bp.route("/orders")
+@login_required
+def orders_page(): return render_template("orders.html")
 @bp.route("/staff")
 @roles("STAFF","ADMIN")
 def staff_page(): return render_template("staff.html")
