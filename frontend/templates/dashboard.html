@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width,initial-scale=1">
+	<title>Order | Smart Canteen</title>
+	<link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+	<nav>
+		<b>SMART CANTEEN</b>
+		<span class="nav-context">MAIN CANTEEN <span aria-hidden="true">/</span> STUDENT</span>
+		<a class="notification-shortcut" href="#notificationsTitle" aria-label="Notifications, 0 unread">Updates <span class="notification-badge" id="unreadCount" hidden>0</span></a>
+		<button onclick="logout()">Log out</button>
+	</nav>
+	<main class="container dashboard">
+		<header class="dashboard-head">
+			<div>
+				<p class="eyebrow">YOUR CAMPUS KITCHEN</p>
+				<h1 id="welcome">Good food, less waiting.</h1>
+				<p>Choose your meal, place your order, and keep an eye on pickup.</p>
+			</div>
+			<span class="service-pill"><span aria-hidden="true"></span> Taking orders</span>
+		</header>
+
+		<div class="order-layout">
+			<section class="menu-section" aria-labelledby="menuTitle">
+				<div class="section-heading">
+					<div><p class="eyebrow">MADE FRESH ON CAMPUS</p><h2 id="menuTitle">Today's menu</h2></div>
+					<span class="menu-count" id="menuCount"></span>
+				</div>
+				<div class="menu-toolbar">
+					<label class="visually-hidden" for="menuSearch">Search menu</label>
+					<input id="menuSearch" type="search" placeholder="Search dishes..." autocomplete="off">
+					<label class="visually-hidden" for="categoryFilter">Filter by category</label>
+					<select id="categoryFilter"><option value="">All categories</option></select>
+				</div>
+				<div class="menu-grid" id="menu" aria-live="polite"><p class="empty-state">Loading today's menu...</p></div>
+			</section>
+
+			<aside class="checkout-column" aria-label="Your order and pickup status">
+				<section class="checkout-panel">
+					<p class="eyebrow">READY WHEN YOU ARE</p>
+					<h2>Your order</h2>
+					<div id="cart" class="cart-lines"><p class="empty-state">Your basket is empty.</p></div>
+					<div class="cart-total"><span>Subtotal</span><strong id="cartTotal">₹0</strong></div>
+					<p class="pickup-note">Pickup at the counter <span>·</span> ASAP</p>
+					<button class="btn checkout-button" id="placeOrderButton" onclick="placeOrder()" disabled>Place order</button>
+					<p id="orderMsg" class="feedback" role="status" aria-live="polite"></p>
+				</section>
+				<section class="queue-panel">
+					<p class="eyebrow">PICKUP TRACKER</p>
+					<h2>On the pass</h2>
+					<div id="queue" aria-live="polite"><p class="empty-state">Loading your order...</p></div>
+				</section>
+			</aside>
+		</div>
+
+		<div class="activity-grid">
+			<section aria-labelledby="ordersTitle">
+				<div class="section-heading"><div><p class="eyebrow">PAST & PRESENT</p><h2 id="ordersTitle">Your orders</h2></div></div>
+				<div id="orders" class="activity-list"><p class="empty-state">Loading order history...</p></div>
+			</section>
+			<section aria-labelledby="notificationsTitle">
+				<div class="section-heading"><div><p class="eyebrow">CANTEEN UPDATES</p><h2 id="notificationsTitle">Notifications</h2></div></div>
+				<div id="notifications" class="activity-list"><p class="empty-state">Loading notifications...</p></div>
+			</section>
+		</div>
+	</main>
+	<aside class="notification-toast" id="notificationToast" role="status" aria-live="polite" aria-atomic="true" aria-hidden="true">
+		<span class="toast-marker" aria-hidden="true"></span>
+		<span class="toast-message" id="notificationToastText"></span>
+		<a href="#notificationsTitle" class="toast-link">View</a>
+		<button type="button" id="dismissNotificationToast" aria-label="Dismiss notification">×</button>
+	</aside>
+	<script src="/static/js/app.js"></script>
+	<script>initDashboard()</script>
+</body>
+</html>

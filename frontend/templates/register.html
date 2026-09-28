@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width,initial-scale=1">
+	<title>Create Account | Smart Canteen</title>
+	<link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="auth">
+	<main class="auth-wrap">
+		<a class="auth-brand" href="/">SMART CANTEEN <span>· CAMPUS DINING</span></a>
+		<section class="auth-card register-card">
+			<p class="eyebrow">JOIN THE TABLE</p>
+			<h1>Create your account</h1>
+			<p class="auth-intro">Set up your student details to start ordering.</p>
+			<form id="registerForm">
+				<label for="full_name">Full name</label>
+				<input id="full_name" name="full_name" autocomplete="name" placeholder="Your full name" required>
+				<div class="form-row">
+					<div><label for="student_id">Student ID</label><input id="student_id" name="student_id" autocomplete="off" placeholder="e.g. 23CSE101" required></div>
+					<div><label for="phone">Phone</label><input id="phone" name="phone" type="tel" autocomplete="tel" placeholder="Phone number" required></div>
+				</div>
+				<label for="email">College email</label>
+				<input id="email" name="email" type="email" autocomplete="email" placeholder="you@college.edu" required>
+				<div class="form-row">
+					<div><label for="password">Password</label><input id="password" name="password" type="password" autocomplete="new-password" minlength="8" placeholder="8+ characters" required></div>
+					<div><label for="confirm_password">Confirm password</label><input id="confirm_password" name="confirm_password" type="password" autocomplete="new-password" placeholder="Repeat password" required></div>
+				</div>
+				<button class="btn auth-submit" id="registerSubmit" type="submit">Create account</button>
+			</form>
+			<p id="msg" class="feedback" role="alert" aria-live="polite"></p>
+			<p class="auth-foot">Already registered? <a href="/login">Sign in</a></p>
+		</section>
+		<a class="auth-home" href="/">Back to canteen home</a>
+	</main>
+	<script src="/static/js/app.js"></script>
+	<script>initAuthForms()</script>
+</body>
+</html>

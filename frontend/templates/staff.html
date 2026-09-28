@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width,initial-scale=1">
+	<title>Kitchen Queue | Smart Canteen</title>
+	<link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+	<nav><b>SMART CANTEEN</b><span class="nav-context">MAIN CANTEEN <span aria-hidden="true">/</span> KITCHEN</span><button onclick="logout()">Log out</button></nav>
+	<main class="container staff-dashboard">
+		<header class="page-heading">
+			<div><p class="eyebrow">KITCHEN WORKSPACE</p><h1>Order queue</h1><p>Work from the earliest placed order and move each ticket through pickup.</p></div>
+			<div class="refresh-indicator"><span></span> Refreshes automatically</div>
+		</header>
+		<div id="staffOrders" class="staff-order-grid" aria-live="polite"><p class="empty-state">Loading kitchen orders...</p></div>
+	</main>
+	<script src="/static/js/app.js"></script>
+	<script>initStaff()</script>
+</body>
+</html>

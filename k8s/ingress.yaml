@@ -1,0 +1,11 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata: {name: smart-canteen, namespace: smart-canteen}
+spec:
+  rules:
+  - host: smart-canteen.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend: {service: {name: smart-canteen, port: {number: 80}}}
