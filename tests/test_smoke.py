@@ -46,6 +46,16 @@ def test_student_can_sign_in_if_audit_log_write_fails(app):
     assert client.get("/api/me").status_code == 200
 
 
+def test_admin_analytics_loads(app):
+    client = app.test_client()
+    login = client.post("/api/auth/login", json={
+        "email": "admin@example.com",
+        "password": "Admin@123",
+    })
+    assert login.status_code == 200
+    assert client.get("/api/admin/analytics").status_code == 200
+
+
 def test_student_can_cancel_order_and_restore_stock(app):
     with app.app_context():
         db = get_db()
@@ -70,6 +80,9 @@ def test_student_can_cancel_order_and_restore_stock(app):
             "pickup_slot": "ASAP",
         })
         assert order.status_code == 201, order.get_data(as_text=True)
+        history = client.get("/api/orders")
+        assert history.status_code == 200
+        assert history.get_json()["orders"][0]["items"] == "Cancel Test Dish x2"
 
         order_id = order.get_json()["order_id"]
         db_order = get_db().execute("SELECT id, status FROM orders WHERE public_order_id=?", (order_id,)).fetchone()

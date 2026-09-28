@@ -2,9 +2,17 @@ import re, secrets, sqlite3
 from functools import wraps
 from flask import Blueprint, request, jsonify, session, render_template, g, current_app
 from werkzeug.security import generate_password_hash, check_password_hash
-from . import get_db
+from . import DATABASE_URL, get_db
 
 bp = Blueprint("main", __name__)
+
+def inserted_id(cursor):
+    return cursor.fetchone()["id"] if DATABASE_URL else cursor.lastrowid
+
+def item_summary_aggregate():
+    if DATABASE_URL:
+        return "STRING_AGG(m.name || ' x' || CAST(oi.quantity AS TEXT), ', ')"
+    return "GROUP_CONCAT(m.name||' x'||oi.quantity, ', ')"
 
 def user():
     uid = session.get("user_id")
@@ -70,10 +78,11 @@ def register():
     db=get_db()
     role=db.execute("SELECT id FROM roles WHERE name='STUDENT'").fetchone()[0]
     try:
+        returning_id = " RETURNING id" if DATABASE_URL else ""
         cur=db.execute("""INSERT INTO users(full_name,student_id,email,phone,password_hash,role_id,active)
-                          VALUES(?,?,?,?,?,?,1)""",(d["full_name"],d["student_id"],d["email"],d["phone"],
+                          VALUES(?,?,?,?,?,?,1)""" + returning_id,(d["full_name"],d["student_id"],d["email"],d["phone"],
                           generate_password_hash(d["password"]),role))
-        audit("REGISTRATION","users",cur.lastrowid,"Student registered")
+        audit("REGISTRATION","users",inserted_id(cur),"Student registered")
         db.commit()
     except sqlite3.IntegrityError:
         db.rollback(); return jsonify(error="Email or Student ID already exists"),409
@@ -120,7 +129,6 @@ def create_order():
     if not items: return jsonify(error="Cart is empty"),400
     db=get_db(); u=user()
     try:
-        db.execute("BEGIN")
         total=0; checked=[]
         for x in items:
             row=db.execute("SELECT * FROM menu_items WHERE id=? AND availability=1",(x.get("id"),)).fetchone()
@@ -129,9 +137,10 @@ def create_order():
             total += row["price"]*q; checked.append((row,q))
         public=f"SC-{__import__('datetime').datetime.now().year}-{secrets.token_hex(3).upper()}"
         token=db.execute("SELECT COALESCE(MAX(token_number),100)+1 FROM orders WHERE canteen_id=1").fetchone()[0]
+        returning_id = " RETURNING id" if DATABASE_URL else ""
         cur=db.execute("""INSERT INTO orders(public_order_id,user_id,canteen_id,token_number,total,status,pickup_slot)
-                          VALUES(?,?,?,?,?,?,?)""",(public,u["id"],1,token,total,"ORDER_PLACED",d.get("pickup_slot","ASAP")))
-        oid=cur.lastrowid
+                  VALUES(?,?,?,?,?,?,?)""" + returning_id,(public,u["id"],1,token,total,"ORDER_PLACED",d.get("pickup_slot","ASAP")))
+        oid=inserted_id(cur)
         for row,q in checked:
             db.execute("INSERT INTO order_items(order_id,menu_item_id,quantity,unit_price) VALUES(?,?,?,?)",(oid,row["id"],q,row["price"]))
             db.execute("UPDATE menu_items SET stock_quantity=stock_quantity-? WHERE id=?",(q,row["id"]))
@@ -146,7 +155,8 @@ def create_order():
 @login_required
 def orders():
     u=user()
-    rows=get_db().execute("""SELECT o.*, GROUP_CONCAT(m.name||' x'||oi.quantity, ', ') items
+    aggregate=item_summary_aggregate()
+    rows=get_db().execute(f"""SELECT o.*, {aggregate} items
                              FROM orders o JOIN order_items oi ON oi.order_id=o.id
                              JOIN menu_items m ON m.id=oi.menu_item_id
                              WHERE o.user_id=? GROUP BY o.id ORDER BY o.id DESC""",(u["id"],)).fetchall()
@@ -197,8 +207,9 @@ def read_notification(nid):
 @bp.get("/api/staff/orders")
 @roles("STAFF","ADMIN")
 def staff_orders():
-    rows=get_db().execute("""SELECT o.*,u.full_name student,
-        GROUP_CONCAT(m.name||' x'||oi.quantity, ', ') items
+    aggregate=item_summary_aggregate()
+    rows=get_db().execute(f"""SELECT o.*,u.full_name student,
+        {aggregate} items
         FROM orders o JOIN users u ON u.id=o.user_id JOIN order_items oi ON oi.order_id=o.id
         JOIN menu_items m ON m.id=oi.menu_item_id GROUP BY o.id ORDER BY o.id DESC""").fetchall()
     return jsonify(orders=[dict(r) for r in rows])
@@ -231,8 +242,8 @@ def verify(oid):
 def analytics():
     db=get_db()
     total=db.execute("SELECT COUNT(*) FROM users WHERE role_id=(SELECT id FROM roles WHERE name='STUDENT')").fetchone()[0]
-    orders=db.execute("SELECT COUNT(*) FROM orders WHERE date(created_at)=date('now')").fetchone()[0]
-    revenue=db.execute("SELECT COALESCE(SUM(total),0) FROM orders WHERE date(created_at)=date('now') AND status!='CANCELLED'").fetchone()[0]
+    orders=db.execute("SELECT COUNT(*) FROM orders WHERE DATE(created_at)=CURRENT_DATE").fetchone()[0]
+    revenue=db.execute("SELECT COALESCE(SUM(total),0) FROM orders WHERE DATE(created_at)=CURRENT_DATE AND status!='CANCELLED'").fetchone()[0]
     return jsonify(students=total,today_orders=orders,revenue=revenue,active_queue=db.execute("SELECT COUNT(*) FROM queue WHERE status NOT IN ('COLLECTED','CANCELLED')").fetchone()[0])
 
 @bp.get("/api/admin/audit-logs")
