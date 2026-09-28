@@ -3,7 +3,10 @@ from flask import Flask, g
 from werkzeug.security import generate_password_hash
 
 BASE = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-DB = os.path.join(BASE, "database", "database.db")
+DB = os.getenv("DATABASE_PATH") or (
+    os.path.join("/tmp", "smart-canteen.db") if os.getenv("VERCEL")
+    else os.path.join(BASE, "database", "database.db")
+)
 
 def get_db():
     if "db" not in g:
